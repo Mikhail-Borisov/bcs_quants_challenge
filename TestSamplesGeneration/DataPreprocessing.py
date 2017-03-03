@@ -9,7 +9,7 @@ class DataPreprocessing(object):
         self.default_data_path = '../data/'
         self.frequency = str(frequency)
 
-    def raw_ticker_data(self, ticker_name):
+    def get_raw_ticker_data(self, ticker_name):
         folder_path = self.default_data_path + self.frequency + '/' + str(ticker_name)
         final = pd.DataFrame()
         final['close'] = np.load(folder_path + 'close.npy')
@@ -20,3 +20,17 @@ class DataPreprocessing(object):
         final['count'] = np.load(folder_path + 'count.npy')
         final['volume'] = np.load(folder_path + 'volume.npy')
         return final
+
+    def adjust_prices_relative_to_another_price(self, data, to_adjust_prices_list = ['open', 'high', 'low'],
+                                                relative_vector = 'close'):
+        for column in to_adjust_prices_list:
+            data[column] = data[column]/data[relative_vector]
+        return data
+
+    @staticmethod
+    def get_weekly_and_daytime_parameters(datetime_numpy):
+        datetime_python = pd.to_datetime(datetime_numpy)
+        return datetime_python.hour + datetime_python.minute / 60, datetime_python.weekday()
+
+    def get_simple_lags(self, data, lags = 10):
+        assert 'hour'
