@@ -21,8 +21,8 @@ class DataPreprocessing(object):
         self.frequency = frequency
         self.default_market_open_hour = 10
         self.clean_market_open_data = False
-        self.columns_for_lags = [self.OPEN + '_relative', self.HIGH + '_relative', self.LOW + 'low_relative',
-                                 self.COUNT, self.VOLUME, self.CLOSE + '_relative', 'avg_deal_volume']
+        self.columns_for_lags = [self.OPEN + '_relative', self.HIGH + '_relative', self.LOW + '_relative',
+                                 self.COUNT, self.VOLUME, self.CLOSE + '_relative', self.AVG_VOLUME]
 
     def get_full_ticker_data(self, ticker_name = Tickers.USD000UTSTOM):
         raw_data = self.get_raw_ticker_data(ticker_name)
@@ -83,4 +83,4 @@ class DataPreprocessing(object):
 
 if __name__ == '__main__':
     prep = DataPreprocessing()
-    prep.get_full_ticker_data()
+    prep.get_full_ticker_data(Tickers.ALRS)
