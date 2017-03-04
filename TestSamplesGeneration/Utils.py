@@ -6,7 +6,8 @@ class Frequency(Enum):
     m1 = 'm1'
 
     def get_frequency_part_in_hours(self):
-        return int(str(self.value)[1])/60
+        return int(str(self.value[1]))/60.0
+
 
 class Tickers(Enum):
     ALRS = 'ALRS'

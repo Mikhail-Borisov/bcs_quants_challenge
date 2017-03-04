@@ -31,7 +31,6 @@ class DataPreprocessing(object):
         data[self.CLOSE + '_relative'] = data[self.CLOSE].pct_change()
         data = self.get_lagged_values(data)
         data = self.clean_from_unneeded_data(data)
-        print('HUY')
 
     def get_raw_ticker_data(self, ticker_name):
         folder_path = self.default_data_path + self.frequency.value + '/' + ticker_name.value + '/'
@@ -79,13 +78,9 @@ class DataPreprocessing(object):
         return data
 
     def clean_from_unneeded_data(self, data):
-        del data[self.OPEN]
-        del data[self.CLOSE]
-        del data[self.HIGH]
-        del data[self.LOW]
-        target = data[self.CLOSE + '_relative']
+        pass
 
 
 if __name__ == '__main__':
     prep = DataPreprocessing()
-    prep.get_full_ticker_data(Tickers.GZX)
+    prep.get_full_ticker_data(Tickers.ALRS)
