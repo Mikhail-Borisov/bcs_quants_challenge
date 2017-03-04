@@ -21,10 +21,11 @@ class DataPreprocessing(object):
         final['volume'] = np.load(folder_path + 'volume.npy')
         return final
 
-    def adjust_prices_relative_to_another_price(self, data, to_adjust_prices_list = ['open', 'high', 'low'],
+    @staticmethod
+    def adjust_prices_relative_to_another_price(data, to_adjust_prices_list = ['open', 'high', 'low'],
                                                 relative_vector = 'close'):
         for column in to_adjust_prices_list:
-            data[column] = data[column]/data[relative_vector]
+            data[column + '_relative'] = data[column]/data[relative_vector]
         return data
 
     @staticmethod
@@ -32,5 +33,6 @@ class DataPreprocessing(object):
         datetime_python = pd.to_datetime(datetime_numpy)
         return datetime_python.hour + datetime_python.minute / 60, datetime_python.weekday()
 
-    def get_simple_lags(self, data, lags = 10):
+    @staticmethod
+    def get_simple_lags(data, lags = 10):
         assert 'hour'
