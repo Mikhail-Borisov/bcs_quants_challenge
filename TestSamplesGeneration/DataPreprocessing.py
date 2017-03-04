@@ -18,8 +18,9 @@ class DataPreprocessing(object):
     COUNT = 'count'
     AVG_VOLUME = 'avg_deal_volume'
     TARGET = 'target'
+    HOUR = 'hour'
 
-    def __init__(self, frequency = Frequency.m1):
+    def __init__(self, frequency = Frequency.m1, backward_lags = 5, forward_lag = 5, hour_dummies = True):
         self.default_data_path = os.path.dirname(__file__) + '/../data/'
         self.frequency = frequency
         # This is to fix the fact that 1 minute lag at 10 am is 18:39 of prev day
@@ -30,8 +31,10 @@ class DataPreprocessing(object):
         self.columns_for_lags = [self.OPEN + '_relative', self.HIGH + '_relative', self.LOW + '_relative',
                                  self.COUNT, self.VOLUME, self.CLOSE + '_relative', self.AVG_VOLUME]
         # lags for time series, backward for X, forward for y
-        self.backward_lags = 5
-        self.target_forward_freq_shift = 5
+        self.backward_lags = backward_lags
+        self.target_forward_freq_shift = forward_lag
+        # get dummies for linear model
+        self.hour_dummies = hour_dummies
 
     def get_full_ticker_data(self, ticker_name = Tickers.USD000UTSTOM):
         raw_data = self.get_raw_ticker_data(ticker_name)
@@ -67,6 +70,11 @@ class DataPreprocessing(object):
         # TODO Add important news timers
         data[self.HOUR_FLOAT] = data.index.hour + data.index.minute/60.0
         data[self.WEEKDAY] = data.index.weekday
+        if self.hour_dummies:
+            data[self.HOUR] = data.index.hour
+            data = pd.get_dummies(data, columns=[self.WEEKDAY, self.HOUR])
+        else:
+            data = pd.get_dummies(data, columns=[self.WEEKDAY])
         return data
 
     def get_lagged_values(self, data, clean_for_market_open = True):
@@ -103,7 +111,10 @@ class DataPreprocessing(object):
         del data[self.OPEN + '_relative']
         del data[self.LOW + '_relative']
         del data[self.HIGH + '_relative']
+        if self.hour_dummies:
+            del data[self.HOUR_FLOAT]
         target = data[self.TARGET]
+        del data[self.TARGET]
         return target, data
 
     @staticmethod
