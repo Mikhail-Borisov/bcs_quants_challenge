@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import os
 from TestSamplesGeneration.Utils import Frequency, Tickers
+import talib
+from talib import MA_Type
 
 
 class DataPreprocessing(object):
@@ -80,6 +82,33 @@ class DataPreprocessing(object):
     def clean_from_unneeded_data(self, data):
         pass
 
+    @staticmethod
+    def add_sma(data, column='close', timeperiod=12):
+        """ Add simple moving average to your dataframe"""
+        # TODO Update description
+        if (column in data.columns):
+            chosen_column = data[column].values
+            new_column = pd.Series(talib.SMA(chosen_column, timeperiod=timeperiod),
+                                   name=(column+'_sma_'+str(timeperiod)))
+        else:
+            print('Column name does not exist in the dataframe')
+            return
+        return pd.concat([data, new_column], axis=1)
+
+    @staticmethod
+    def add_bbands(data, column='close', timeperiod=12, stdup = 2, stddn = 2, matype=MA_Type.T3):
+        """" Add upper, middle and lower Bollinger Bands to your dataframe"""
+        # TODO Update description
+        if (column in data.columns):
+            chosen_column = data[column].values
+            upper, middle, lower = talib.BBANDS(chosen_column, timeperiod=timeperiod, nbdevup=stdup,
+                                                nbdevdn=stddn, matype=matype)
+            new_columns = pd.DataFrame([upper, middle, lower],
+                                       columns=[column+'_bb_up', column+'_bb_mid', column+'_bb_low'])
+        else:
+            print('Column name does not exist in the dataframe')
+            return
+        return pd.concat([data, new_columns], axis=1)
 
 if __name__ == '__main__':
     prep = DataPreprocessing()
