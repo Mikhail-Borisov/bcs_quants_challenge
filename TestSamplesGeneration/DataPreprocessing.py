@@ -36,13 +36,13 @@ class DataPreprocessing(object):
         # get dummies for linear model
         self.hour_dummies = hour_dummies
 
-    def get_full_ticker_data(self, ticker_name = Tickers.USD000UTSTOM):
+    def get_full_ticker_data(self, ticker_name = Tickers.USD000UTSTOM, sample_size = 0.5):
         raw_data = self.get_raw_ticker_data(ticker_name)
         data = self.adjust_prices_relative_to_another_price(raw_data)
         data = self.get_weekly_and_daytime_parameters(data)
         data[self.CLOSE + '_relative'] = data[self.CLOSE].pct_change()
         data = self.get_lagged_values(data)
-        y, X = self.clean_from_unneeded_data(data)
+        y, X = self.clean_from_unneeded_data(data, sample_size)
         return y, X
 
     def get_raw_ticker_data(self, ticker_name):
@@ -99,7 +99,7 @@ class DataPreprocessing(object):
                     data.loc[data[self.HOUR_FLOAT]>=hour_to_end, column + '_lag' + str(i)] = np.nan
         return data
 
-    def clean_from_unneeded_data(self, data):
+    def clean_from_unneeded_data(self, data, sample_size):
         del data[self.OPEN]
         del data[self.CLOSE]
         del data[self.HIGH]
@@ -111,6 +111,8 @@ class DataPreprocessing(object):
         del data[self.OPEN + '_relative']
         del data[self.LOW + '_relative']
         del data[self.HIGH + '_relative']
+        daterange = (data.index.max() - data.index.min()) * sample_size
+        data = data.loc[:data.index.min() + daterange]
         if self.hour_dummies:
             del data[self.HOUR_FLOAT]
         target = data[self.TARGET]
@@ -145,6 +147,9 @@ class DataPreprocessing(object):
             return
         return pd.concat([data, new_columns], axis=1)
 
+    def add_prev_day_info(self, data):
+        pass
+    
 if __name__ == '__main__':
     prep = DataPreprocessing()
     prep.get_full_ticker_data(Tickers.ALRS)
