@@ -5,7 +5,8 @@
 from __future__ import print_function
 from datetime import datetime as dt
 import numpy as np
-import csv, os
+import csv
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plotticker
@@ -15,19 +16,20 @@ orderEvent = False
 tickSizeToSeconds = {'s1': 1, 's5': 5, 'm1': 60, 'm5': 300}
 dataKeys = ['time', 'open', 'high', 'low', 'close', 'volume', 'count']
 tickKeys = ['direct', 'takeProfit', 'stopLoss', 'holdPeriod', 'datetime']
-FEE = 0.0002 # комиссия
-allTickers = ['ALRS', 'SNGS', 'MGNT', 'ROSN', 'MOEX', 'VTBR', 'LKOH', 'GAZP', 'SBERP', 'SBER', # акции
-              'USD000UTSTOM', # валюта
-              'RTSI', 'MICEXINDEXCF', # индексы
-              'GZX', 'SIX', 'BRX'] # фьючерсы
+FEE = 0.0002  # комиссия
+allTickers = ['ALRS', 'SNGS', 'MGNT', 'ROSN', 'MOEX', 'VTBR', 'LKOH', 'GAZP', 'SBERP', 'SBER',  # акции
+              'USD000UTSTOM',  # валюта
+              'RTSI', 'MICEXINDEXCF',  # индексы
+              'GZX', 'SIX', 'BRX']  # фьючерсы
 _tickSize = 'm5'
 
 FIRST_TEST_DAYTIME = dt(2015, 1, 5, 10, 0, 0)
 LAST_TEST_DAYTIME = dt(2016, 8, 31, 18, 35, 0)
 
 def showBacktestResult(result):
-    return pd.DataFrame(result, index=[x['ticker'] for x in result],
-                                columns=['sumProcent', 'std', 'sharpe',
+    return pd.DataFrame(result,
+                        index=[x['ticker'] for x in result],
+                        columns=['sumProcent', 'std', 'sharpe',
                                          'minV', 'numDeals',
                                          'sumTakeProfit', 'sumHoldPeriod', 'sumStopLoss'])
 
