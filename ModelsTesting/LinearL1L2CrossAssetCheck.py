@@ -16,7 +16,7 @@ class L1L2Checker(object):
         prep_class = DataPreprocessing(frequency= frequency, backward_lags=lags, forward_lag=self.forward_lag)
         reg_params = {}
         for ticker in Tickers:
-            y, X = prep_class.get_full_ticker_data(ticker, sample_size=self.for_cross_val_sample)
+            y, X = prep_class.get_full_ticker_data(ticker, sample_size=self.for_cross_val_sample, use_first_sample = True)
             model = ElasticNetCV(l1_ratio= self.l1_ratios, cv=TimeSeriesSplit(10), n_jobs=-1, normalize=True)
             model.fit(X, y)
             reg_params[ticker] = [model.alpha_, model.l1_ratio_]
@@ -26,4 +26,4 @@ class L1L2Checker(object):
 
 if __name__ == '__main__':
     checker = L1L2Checker()
-    checker.get_cross_assest_l1l2_report(Frequency.m5, lags=5)
+    checker.get_cross_assest_l1l2_report(Frequency.m1, lags=25)
