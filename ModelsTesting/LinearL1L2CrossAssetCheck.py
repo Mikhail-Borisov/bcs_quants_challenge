@@ -1,7 +1,7 @@
 from sklearn.linear_model import ElasticNetCV
 from sklearn.model_selection import TimeSeriesSplit
 import pandas as pd
-from TestSamplesGeneration.DataPreprocessing import DataPreprocessing
+from TestSamplesGeneration.DataPreprocessingForNonlinear import DataPreprocessingForNonlinear
 from TestSamplesGeneration.Utils import Frequency, Tickers
 
 
@@ -13,7 +13,7 @@ class L1L2Checker(object):
 
     def get_cross_assest_l1l2_report(self, frequency = Frequency.m1, lags = 15):
         print(frequency, lags, self.forward_lag)
-        prep_class = DataPreprocessing(frequency= frequency, backward_lags=lags, forward_lag=self.forward_lag)
+        prep_class = DataPreprocessingForNonlinear(frequency= frequency, backward_lags=lags, forward_lag=self.forward_lag)
         reg_params = {}
         for ticker in Tickers:
             y, X = prep_class.get_full_ticker_data(ticker, sample_size=self.for_cross_val_sample, use_first_sample = True)

@@ -4,13 +4,13 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import TimeSeriesSplit
 from xgboost.sklearn import XGBRegressor
 
-from TestSamplesGeneration.DataPreprocessing import DataPreprocessing
+from TestSamplesGeneration.DataPreprocessingForNonlinear import DataPreprocessingForNonlinear
 from TestSamplesGeneration.Utils import Tickers
 
 
 class XGBoostFastParametersFit(object):
     def __init__(self):
-        self.data_class = DataPreprocessing(backward_lags=15, forward_lag=0)
+        self.data_class = DataPreprocessingForNonlinear(backward_lags=15, forward_lag=0)
         self.windows_in_days = 10
 
     def run_xgb_hyperparams_selection(self, ticker = Tickers.USD000UTSTOM):

@@ -4,22 +4,23 @@ from sklearn.linear_model import SGDRegressor
 import pandas as pd
 import xgboost as xgb
 from sklearn import preprocessing
-from TestSamplesGeneration.DataPreprocessing import DataPreprocessing
+from TestSamplesGeneration.DataPreprocessingForNonlinear import DataPreprocessingForNonlinear
 from TestSamplesGeneration.Utils import Tickers
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_absolute_error, r2_score
+
 
 class XGBoostOnlineBatchParametersFit(object):
     def __init__(self):
-        self.data_class = DataPreprocessing(backward_lags=30, forward_lag=0)
+        self.data_class = DataPreprocessingForNonlinear(backward_lags=30, forward_lag=0, hour_dummies=False)
         self.backward_window_in_days = 100
-        self.forward_window_in_days = 5
-        self.weights = 'none'
+        self.forward_window_in_days = 1
+        self.weights = 'linear'
 
     def run_xgboost_testing(self, ticker = Tickers.USD000UTSTOM):
-        y_train, X_train = self.data_class.get_full_ticker_data(ticker, sample_size=0.3)
-        starting_time = X_train.index.min()
+        y_train, X_train = self.data_class.get_full_ticker_data(ticker, sample_size=0.5)
+        starting_time = X_train.index.min() - timedelta(hours=1)
         sample_length = (X_train.index.max() - X_train.index.min()).days
-        results = []
+        results = pd.DataFrame()
         for period in range(1, sample_length):
             sample_end_time = starting_time + timedelta(days=self.backward_window_in_days) - timedelta(hours=1)
             # train model with weights
@@ -38,22 +39,16 @@ class XGBoostOnlineBatchParametersFit(object):
             y_test = y_train.loc[(y_train.index>=test_set_start_time) &
                             (y_train.index <= test_set_start_time +
                              timedelta(days=self.forward_window_in_days) - timedelta(hours=1))]
-            half_test_r_square, quater_test_r_square, test_r_square = self.get_test_r_square_result(X_test_pandas,
-                                                                                                    model, y_test)
-            # print([starting_time, round(in_sample_r_square,4), round(test_r_square, 4),
-            #                 round(half_test_r_square, 4), round(quater_test_r_square, 4)])
-            results.append([starting_time, round(in_sample_r_square,4), round(test_r_square, 4),
-                            round(half_test_r_square, 4), round(quater_test_r_square, 4)])
-            starting_time += timedelta(days=1)
-        final_result = self.get_final_result(results, ticker)
+            y_test_final = self.get_test_result(X_test_pandas, model, y_test)
+            results = pd.concat([results, y_test_final], copy=False)
+            starting_time += timedelta(days=self.forward_window_in_days)
+        self.get_final_result(results, ticker)
 
-    def get_test_r_square_result(self, X_test_pandas, model, y_test):
-        test_r_square = r2_score(y_test, model.predict(xgb.DMatrix(X_test_pandas)))
-        half_test_r_square = r2_score(y_test.iloc[:len(y_test) / 2],
-                                      model.predict(xgb.DMatrix(X_test_pandas[:len(X_test_pandas) / 2])))
-        quater_test_r_square = r2_score(y_test.iloc[:len(y_test) / 4],
-                                        model.predict(xgb.DMatrix(X_test_pandas[:len(X_test_pandas) / 4])))
-        return half_test_r_square, quater_test_r_square, test_r_square
+    def get_test_result(self, X_test_pandas, model, y_test):
+        final = pd.DataFrame()
+        final['y_test'] = y_test
+        final['predicted'] = model.predict(xgb.DMatrix(X_test_pandas))
+        return final
 
     def get_fitted_model(self, X, y):
         param = {'max_depth': 1, 'min_child_weight': 9, 'eta': 0.05,
@@ -72,9 +67,11 @@ class XGBoostOnlineBatchParametersFit(object):
         return model, r_square
 
     def get_final_result(self, results, ticker):
-        final = pd.DataFrame(results, columns=['time', 'in_sample', 'full_test', 'test/2', 'test/4'])
+        r2 = r2_score(results['y_test'], results['predicted'])
+        rmse = mean_absolute_error(results['y_test'], results['predicted'])
         print(self.weights, self.backward_window_in_days, self.forward_window_in_days, ticker,
-            final['full_test'].mean(), final['test/2'].mean(), final['test/4'].mean())
+            r2, rmse)
+        results.to_csv('xgboost_result_' + ticker.value + '.csv')
 
 
 if __name__ == '__main__':

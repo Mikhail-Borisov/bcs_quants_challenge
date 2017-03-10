@@ -19,6 +19,7 @@ class Tickers(Enum):
     MICEXINDEXCF = 'MICEXINDEXCF'
     MOEX = 'MOEX'
     ROSN = 'ROSN'
+    RTSI = 'RTSI'
     SBER = 'SBER'
     SBERP = 'SBERP'
     SIX = 'SIX'

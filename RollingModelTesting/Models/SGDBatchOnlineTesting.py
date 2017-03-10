@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.linear_model import SGDRegressor
 from sklearn.model_selection import GridSearchCV
 from sklearn import preprocessing
-from TestSamplesGeneration.DataPreprocessing import DataPreprocessing
+from TestSamplesGeneration.DataPreprocessingForNonlinear import DataPreprocessingForNonlinear
 from TestSamplesGeneration.Utils import Tickers
 from sklearn.metrics import mean_squared_error, r2_score
 import pandas as pd
@@ -11,7 +11,7 @@ import pandas as pd
 
 class SGDOnlineBatchParametersFit(object):
     def __init__(self):
-        self.data_class = DataPreprocessing(backward_lags=3, forward_lag=0)
+        self.data_class = DataPreprocessingForNonlinear(backward_lags=4, forward_lag=0)
         self.backward_window_in_days = 50
         self.forward_window_in_days = 1
         self.weights = 'none'
@@ -23,7 +23,6 @@ class SGDOnlineBatchParametersFit(object):
         sample_length = (X_train.index.max() - X_train.index.min()).days
         results = []
         for period in range(1, sample_length):
-            print(starting_time)
             sample_end_time = starting_time + timedelta(days=self.backward_window_in_days) - timedelta(hours=1)
             # train model with weights
             X_train_model = X_train.loc[(X_train.index>=starting_time) &
@@ -75,4 +74,5 @@ class SGDOnlineBatchParametersFit(object):
 if __name__ == '__main__':
     fitter = SGDOnlineBatchParametersFit()
     for ticker in Tickers:
+        print(ticker)
         fitter.run_sgd_testing(ticker)

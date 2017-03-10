@@ -6,7 +6,8 @@ import talib
 from talib import MA_Type
 
 
-class DataPreprocessing(object):
+class DataPreprocessingForNonlinear(object):
+    VWAP = 'vwap_aprox'
     WEEKDAY = 'weekday'
     HOUR_FLOAT = 'hour_float'
     TIME = 'time'
@@ -29,7 +30,7 @@ class DataPreprocessing(object):
         self.clean_market_open_close_data = True
         ########################
         self.columns_for_lags = [self.OPEN + '_relative', self.HIGH + '_relative', self.LOW + '_relative',
-                                 self.COUNT, self.VOLUME, self.CLOSE + '_relative', self.AVG_VOLUME]
+                                 self.COUNT, self.VOLUME, self.CLOSE + '_relative', self.VWAP]
         # lags for time series, backward for X, forward for y
         self.backward_lags = backward_lags
         self.target_forward_freq_shift = forward_lag
@@ -40,6 +41,8 @@ class DataPreprocessing(object):
         raw_data = self.get_raw_ticker_data(ticker_name)
         data = self.adjust_prices_relative_to_another_price(raw_data)
         data = self.get_weekly_and_daytime_parameters(data)
+        data[self.VWAP] = ((data[self.OPEN] + data[self.CLOSE] +
+                            (data[self.LOW] + data[self.HIGH]) / 2) / 3) / data[self.CLOSE]
         data[self.CLOSE + '_relative'] = data[self.CLOSE].pct_change()
         data = self.get_lagged_values(data)
         y, X = self.clean_from_unneeded_data(data, sample_size, use_first_sample)
@@ -53,9 +56,8 @@ class DataPreprocessing(object):
         final[self.HIGH] = np.load(folder_path + self.HIGH + '.npy')
         final[self.LOW] = np.load(folder_path + self.LOW + '.npy')
         final[self.TIME] = np.load(folder_path + self.TIME + '.npy')
-        final[self.COUNT] = np.load(folder_path + self.COUNT + '.npy')
-        final[self.VOLUME] = np.load(folder_path + self.VOLUME + '.npy')
-        final[self.AVG_VOLUME] = final[self.VOLUME]/final[self.COUNT]
+        final[self.COUNT] = np.log(np.load(folder_path + self.COUNT + '.npy') + 1)
+        final[self.VOLUME] = np.log(np.load(folder_path + self.VOLUME + '.npy') + 1)
         return final.set_index(self.TIME)
 
     @staticmethod
@@ -84,22 +86,26 @@ class DataPreprocessing(object):
                 data[column + '_lag' + str(i)] = data[column].shift(i)
         if clean_for_market_open and self.HOUR_FLOAT in data.columns:
             data = self.clean_lags_for_market_open(data, self.backward_lags, self.columns_for_lags)
+        else:
+            data.dropna(inplace=True)
         return data
 
     def clean_lags_for_market_open(self, data, lags, columns_for_lags):
         hour_to_start = self.default_market_open_hour + self.frequency.get_frequency_part_in_hours() * lags
         hour_to_end = self.default_market_close_hour - self.frequency.get_frequency_part_in_hours() \
                                                        * self.target_forward_freq_shift
+        data.loc[data[self.HOUR_FLOAT] >= hour_to_end] = np.nan
         if self.clean_market_open_close_data:
             data = data.loc[(data[self.HOUR_FLOAT]>hour_to_start) & (data[self.HOUR_FLOAT]<hour_to_end)].dropna()
         else:
             for i in range(1, lags + 1):
                 for column in columns_for_lags:
-                    data.loc[data[self.HOUR_FLOAT]<=hour_to_start, column + '_lag' + str(i)] = np.nan
-                    data.loc[data[self.HOUR_FLOAT]>=hour_to_end, column + '_lag' + str(i)] = np.nan
+                    lag_hour_start = self.default_market_open_hour + self.frequency.get_frequency_part_in_hours() * i
+                    data.loc[data[self.HOUR_FLOAT]<lag_hour_start, column + '_lag' + str(i)] = np.nan
         return data
 
     def clean_from_unneeded_data(self, data, sample_size, use_first_sample):
+        data = data.loc[data[self.TARGET]>-2].fillna(-999.0)
         daterange = (data.index.max() - data.index.min()) * sample_size
         if use_first_sample:
             data = data.loc[:data.index.min() + daterange]
@@ -110,12 +116,12 @@ class DataPreprocessing(object):
         del data[self.HIGH]
         del data[self.LOW]
         del data[self.VOLUME]
-        del data[self.AVG_VOLUME]
         del data[self.COUNT]
         del data[self.CLOSE + '_relative']
-        del data[self.OPEN + '_relative']
-        del data[self.LOW + '_relative']
         del data[self.HIGH + '_relative']
+        del data[self.LOW + '_relative']
+        del data[self.OPEN + '_relative']
+        del data[self.VWAP]
         if self.hour_dummies:
             del data[self.HOUR_FLOAT]
         target = data[self.TARGET]
@@ -154,5 +160,5 @@ class DataPreprocessing(object):
         pass
     
 if __name__ == '__main__':
-    prep = DataPreprocessing()
+    prep = DataPreprocessingForNonlinear()
     prep.get_full_ticker_data(Tickers.ALRS)
