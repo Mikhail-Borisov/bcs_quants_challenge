@@ -26,3 +26,4 @@ class Tickers(Enum):
     SNGS = 'SNGS'
     USD000UTSTOM = 'USD000UTSTOM'
     VTBR = 'VTBR'
+

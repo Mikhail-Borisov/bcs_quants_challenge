@@ -1,3 +1,5 @@
+from glob import glob
+
 import pandas as pd
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
@@ -5,7 +7,7 @@ import seaborn as sns
 sns.set(style="darkgrid", color_codes=True)
 from TestSamplesGeneration.Utils import Tickers
 import matplotlib.pyplot as plt
-
+from sklearn.metrics import r2_score
 
 
 class ResultsCheck(object):
@@ -16,8 +18,11 @@ class ResultsCheck(object):
         pdf = PdfPages(result_filename)
         for ticker in Tickers:
             ticker_filename = self.path_name + ticker.value + '.csv'
-            fig = self.get_ticker_report(ticker_filename)
-            pdf.savefig(fig)
+            try:
+                fig = self.get_ticker_report(ticker_filename)
+                pdf.savefig(fig)
+            except:
+                continue
         pdf.close()
 
     def get_ticker_report(self, ticker_filename):
@@ -59,6 +64,7 @@ class ResultsCheck(object):
 
     def get_returns(self, ticker_filename):
         data = pd.read_csv(ticker_filename, index_col=0, parse_dates=True)
+        print(ticker_filename, r2_score(data['y_test'], data['predicted']))
         data['predicted_true'] = np.sign(data['y_test'] * data['predicted'])
         data['return'] = data['y_test'].abs() * data['predicted_true']
         data['abs_predicted'] = np.abs(data['predicted'])
@@ -69,4 +75,4 @@ class ResultsCheck(object):
 
 if __name__ == '__main__':
     report = ResultsCheck()
-    report.load_all_tickers_report('simple_single_asset_100days_window_m1.pdf')
+    report.load_all_tickers_report('simple_single_asset_100days_window_m1_linearModels.pdf')

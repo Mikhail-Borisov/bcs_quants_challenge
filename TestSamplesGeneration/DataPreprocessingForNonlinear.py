@@ -20,6 +20,10 @@ class DataPreprocessingForNonlinear(object):
     AVG_VOLUME = 'avg_deal_volume'
     TARGET = 'target'
     HOUR = 'hour'
+    BB_UPPER = 'bb_upper'
+    BB_LOWER = 'bb_lower'
+    BB_MIDLE = 'bb_midle'
+    GENERAL_PRICES = [Tickers.USD000UTSTOM, Tickers.MICEXINDEXCF, Tickers.SIX, Tickers.BRX, Tickers.GZX]
 
     def __init__(self, frequency = Frequency.m1, backward_lags = 5, forward_lag = 5, hour_dummies = True):
         self.default_data_path = os.path.dirname(__file__) + '/../data/'
@@ -36,10 +40,13 @@ class DataPreprocessingForNonlinear(object):
         self.target_forward_freq_shift = forward_lag
         # get dummies for linear model
         self.hour_dummies = hour_dummies
+        self.actual_additional_tickers = []
 
     def get_full_ticker_data(self, ticker_name = Tickers.USD000UTSTOM, sample_size = 0.5, use_first_sample = True):
+        self.actual_additional_tickers = []
         raw_data = self.get_raw_ticker_data(ticker_name)
-        data = self.adjust_prices_relative_to_another_price(raw_data)
+        data = self.add_bbands(raw_data)
+        data = self.adjust_prices_relative_to_another_price(data)
         data = self.get_weekly_and_daytime_parameters(data)
         data[self.VWAP] = ((data[self.OPEN] + data[self.CLOSE] +
                             (data[self.LOW] + data[self.HIGH]) / 2) / 3) / data[self.CLOSE]
@@ -49,7 +56,30 @@ class DataPreprocessingForNonlinear(object):
         return y, X
 
     def get_raw_ticker_data(self, ticker_name):
+        unified_time_index = pd.read_csv(os.path.dirname(__file__) + '/final_index.csv', index_col=1, parse_dates=True,
+                                         header=None).index
         folder_path = self.default_data_path + self.frequency.value + '/' + ticker_name.value + '/'
+        final = self.get_columns_ticker_data(folder_path, unified_time_index)
+        for ticker in self.GENERAL_PRICES:
+            if ticker_name != ticker:
+                local_data = self.get_reduced_columns_ticker_data(ticker, unified_time_index)
+                final.loc[:, ticker.name + self.CLOSE] = local_data[self.CLOSE]
+                final.loc[:, ticker.name + self.VOLUME] = local_data[self.VOLUME]
+                self.actual_additional_tickers.append(ticker.name)
+        return final
+
+    def get_reduced_columns_ticker_data(self, ticker, unified_time_index):
+        path = self.default_data_path + self.frequency.value + '/' + ticker.value + '/'
+        local_data = pd.DataFrame()
+        local_data[self.CLOSE] = np.load(path + self.CLOSE + '.npy')
+        local_data[self.VOLUME] = np.load(path + self.VOLUME + '.npy')
+        local_data[self.TIME] = np.load(path + self.TIME + '.npy')
+        local_data.set_index(self.TIME, inplace=True)
+        local_data = local_data.loc[unified_time_index].fillna(method='bfill').fillna(method='ffill')
+        local_data[self.CLOSE] = local_data[self.CLOSE].pct_change()
+        return local_data.fillna(0.0)
+
+    def get_columns_ticker_data(self, folder_path, time_index):
         final = pd.DataFrame()
         final[self.CLOSE] = np.load(folder_path + self.CLOSE + '.npy')
         final[self.OPEN] = np.load(folder_path + self.OPEN + '.npy')
@@ -58,7 +88,9 @@ class DataPreprocessingForNonlinear(object):
         final[self.TIME] = np.load(folder_path + self.TIME + '.npy')
         final[self.COUNT] = np.log(np.load(folder_path + self.COUNT + '.npy') + 1)
         final[self.VOLUME] = np.log(np.load(folder_path + self.VOLUME + '.npy') + 1)
-        return final.set_index(self.TIME)
+        final.set_index(self.TIME, inplace=True)
+        final = final.loc[time_index].fillna(method='bfill').fillna(method='ffill')
+        return final
 
     @staticmethod
     def adjust_prices_relative_to_another_price(data, to_adjust_prices_list = ['open', 'high', 'low'],
@@ -84,6 +116,12 @@ class DataPreprocessingForNonlinear(object):
         for i in range(1, self.backward_lags + 1):
             for column in self.columns_for_lags:
                 data[column + '_lag' + str(i)] = data[column].shift(i)
+            for column in self.actual_additional_tickers:
+                data[column + self.CLOSE + '_lag' + str(i)] = data[column + self.CLOSE].shift(i)
+                data[column + self.VOLUME + '_lag' + str(i)] = data[column + self.VOLUME].shift(i)
+        data[self.BB_LOWER + '_lag1'] = data[self.BB_LOWER].shift(1)
+        data[self.BB_UPPER + '_lag1'] = data[self.BB_UPPER].shift(1)
+        data[self.BB_MIDLE + '_lag1'] = data[self.BB_MIDLE].shift(1)
         if clean_for_market_open and self.HOUR_FLOAT in data.columns:
             data = self.clean_lags_for_market_open(data, self.backward_lags, self.columns_for_lags)
         else:
@@ -122,6 +160,12 @@ class DataPreprocessingForNonlinear(object):
         del data[self.LOW + '_relative']
         del data[self.OPEN + '_relative']
         del data[self.VWAP]
+        del data[self.BB_MIDLE]
+        del data[self.BB_UPPER]
+        del data[self.BB_LOWER]
+        for ticker in self.actual_additional_tickers:
+            del data[ticker + self.CLOSE]
+            del data[ticker + self.VOLUME]
         if self.hour_dummies:
             del data[self.HOUR_FLOAT]
         target = data[self.TARGET]
@@ -141,16 +185,17 @@ class DataPreprocessingForNonlinear(object):
             return
         return pd.concat([data, new_column], axis=1)
 
-    @staticmethod
-    def add_bbands(data, column='close', timeperiod=12, stdup = 2, stddn = 2, matype=MA_Type.T3):
+    def add_bbands(self, data, column='close', timeperiod=5, stdup = 2, stddn = 2, matype=MA_Type.T3):
         """" Add upper, middle and lower Bollinger Bands to your dataframe"""
         # TODO Update description
         if (column in data.columns):
             chosen_column = data[column].values
             upper, middle, lower = talib.BBANDS(chosen_column, timeperiod=timeperiod, nbdevup=stdup,
                                                 nbdevdn=stddn, matype=matype)
-            new_columns = pd.DataFrame([upper, middle, lower],
-                                       columns=[column+'_bb_up', column+'_bb_mid', column+'_bb_low'])
+            new_columns = pd.DataFrame(index=data.index)
+            new_columns[self.BB_UPPER] = upper/chosen_column
+            new_columns[self.BB_LOWER] = lower/chosen_column
+            new_columns[self.BB_MIDLE] = middle/chosen_column
         else:
             print('Column name does not exist in the dataframe')
             return
