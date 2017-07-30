@@ -75,4 +75,4 @@ class ResultsCheck(object):
 
 if __name__ == '__main__':
     report = ResultsCheck()
-    report.load_all_tickers_report('simple_single_asset_100days_window_m1_linearModels.pdf')
+    report.load_all_tickers_report('simple_multi_asset_125days_window_m1_linearModels.pdf')

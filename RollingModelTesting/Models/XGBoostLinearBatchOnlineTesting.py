@@ -14,18 +14,18 @@ from sklearn.metrics import mean_absolute_error, r2_score
 class XGBoostOnlineBatchParametersFit(object):
     def __init__(self):
         self.data_class = DataPreprocessingForNonlinear(backward_lags=5, forward_lag=0, hour_dummies=True)
-        self.backward_window_in_days = 125
+        self.backward_window_in_days = 25
         self.forward_window_in_days = 1
         self.weights = 'none'
 
     def run_xgboost_testing(self, ticker = Tickers.USD000UTSTOM):
-        y_train, X_train = self.data_class.get_full_ticker_data(ticker, sample_size=0.5)
+        y_train, X_train = self.data_class.get_full_ticker_data(ticker, sample_size=0.99)
         starting_time = X_train.index.min() - timedelta(hours=1)
         sample_length = (X_train.index.max() - X_train.index.min()).days
         results = pd.DataFrame()
         for period in range(1, sample_length):
             sample_end_time = starting_time + timedelta(days=self.backward_window_in_days) - timedelta(hours=1)
-            print(starting_time, sample_end_time)
+            # print(starting_time, sample_end_time)
             # train model with weights
             X_train_model = X_train.loc[(X_train.index>=starting_time) &
                                         (X_train.index <= sample_end_time)]

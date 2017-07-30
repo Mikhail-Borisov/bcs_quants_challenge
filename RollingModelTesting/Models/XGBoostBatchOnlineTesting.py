@@ -11,13 +11,13 @@ from sklearn.metrics import mean_absolute_error, r2_score
 
 class XGBoostOnlineBatchParametersFit(object):
     def __init__(self):
-        self.data_class = DataPreprocessingForNonlinear(backward_lags=30, forward_lag=0, hour_dummies=False)
+        self.data_class = DataPreprocessingForNonlinear(backward_lags=5, forward_lag=0, hour_dummies=False)
         self.backward_window_in_days = 125
         self.forward_window_in_days = 1
         self.weights = 'none'
 
     def run_xgboost_testing(self, ticker = Tickers.USD000UTSTOM):
-        y_train, X_train = self.data_class.get_full_ticker_data(ticker, sample_size=0.5)
+        y_train, X_train = self.data_class.get_full_ticker_data(ticker, sample_size=0.99)
         starting_time = X_train.index.min() - timedelta(hours=1)
         sample_length = (X_train.index.max() - X_train.index.min()).days
         results = pd.DataFrame()
@@ -42,7 +42,8 @@ class XGBoostOnlineBatchParametersFit(object):
             y_test_final = self.get_test_result(X_test_pandas, model, y_test)
             print(r2_score(y_test_final['y_test'], y_test_final['predicted']))
             results = pd.concat([results, y_test_final], copy=False)
-            starting_time += timedelta(days=self.forward_window_in_days)
+            to_add_move_diff = (test_set_start_time - sample_end_time).days
+            starting_time += timedelta(days=self.forward_window_in_days + to_add_move_diff)
         self.get_final_result(results, ticker)
 
     def get_test_result(self, X_test_pandas, model, y_test):
