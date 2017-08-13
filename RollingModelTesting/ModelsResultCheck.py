@@ -12,12 +12,13 @@ from sklearn.metrics import r2_score
 
 class ResultsCheck(object):
     def __init__(self):
-        self.path_name = 'xgboost_result_'
+        self.path_name = 'xgboost_result_tree_UPDATED_'
+        self.cost = 0.00002
 
     def load_all_tickers_report(self, result_filename):
         pdf = PdfPages(result_filename)
         for ticker in Tickers:
-            ticker_filename = self.path_name + ticker.value + '.csv'
+            ticker_filename = self.path_name + ticker.value + '_ADDITIONAL_ASSETS.csv'
             try:
                 fig = self.get_ticker_report(ticker_filename)
                 pdf.savefig(fig)
@@ -46,7 +47,7 @@ class ResultsCheck(object):
 
     def get_data_for_threshold(self, data):
         for_thr = []
-        for threshold in np.linspace(0.0, data['abs_predicted'].max(), 300):
+        for threshold in np.linspace(0.0, 0.0002, 300):
             mean_with_costs = data.loc[data['abs_predicted'] >= threshold, 'net_return'].mean()
             return_std = data.loc[data['abs_predicted'] >= threshold, 'net_return'].std()
             total_return = data.loc[data['abs_predicted'] >= threshold, 'net_return'].sum()
@@ -56,7 +57,7 @@ class ResultsCheck(object):
             sharpe = daily.mean() * np.sqrt(240) / daily.std()
             for_thr.append([threshold, mean_with_costs, return_std, sharpe, total_return, n_deals])
         for_thr = pd.DataFrame(for_thr, columns=['threshold', 'mean', 'std', 'sharpe', 'total', 'n'])
-        for_thr = for_thr.loc[(for_thr['n'] > 10) & (for_thr['threshold'] > 0.02 / 100)]
+        for_thr = for_thr.loc[(for_thr['n'] > 10) & (for_thr['threshold'] > self.cost*0.1)]
         for_thr['upper'] = for_thr['mean'] + for_thr['std']
         for_thr['lower'] = for_thr['mean'] - for_thr['std']
         for_thr.set_index('threshold', inplace=True)
@@ -68,11 +69,11 @@ class ResultsCheck(object):
         data['predicted_true'] = np.sign(data['y_test'] * data['predicted'])
         data['return'] = data['y_test'].abs() * data['predicted_true']
         data['abs_predicted'] = np.abs(data['predicted'])
-        data['cost'] = 0.03 / 100
+        data['cost'] = self.cost
         data['net_return'] = data['return'] - data['cost']
         data['day'] = data.index.date
         return data
 
 if __name__ == '__main__':
     report = ResultsCheck()
-    report.load_all_tickers_report('simple_multi_asset_125days_window_m1_linearModels.pdf')
+    report.load_all_tickers_report('multi_asset_150days_window_m1_linearModels.pdf')

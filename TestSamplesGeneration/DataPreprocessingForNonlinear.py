@@ -23,9 +23,10 @@ class DataPreprocessingForNonlinear(object):
     BB_UPPER = 'bb_upper'
     BB_LOWER = 'bb_lower'
     BB_MIDLE = 'bb_midle'
-    GENERAL_PRICES = [Tickers.USD000UTSTOM, Tickers.MICEXINDEXCF, Tickers.SIX, Tickers.BRX, Tickers.GZX]
+    ADDITIONAL_PRICES = [Tickers.USD000UTSTOM, Tickers.MICEXINDEXCF, Tickers.SIX, Tickers.BRX, Tickers.GZX]
 
-    def __init__(self, frequency = Frequency.m1, backward_lags = 5, forward_lag = 5, hour_dummies = True):
+    def __init__(self, frequency = Frequency.m1, backward_lags = 5, forward_lag = 1, hour_dummies = True,
+                 threshold = 0.0002):
         self.default_data_path = os.path.dirname(__file__) + '/../data/'
         self.frequency = frequency
         # This is to fix the fact that 1 minute lag at 10 am is 18:39 of prev day
@@ -41,8 +42,10 @@ class DataPreprocessingForNonlinear(object):
         # get dummies for linear model
         self.hour_dummies = hour_dummies
         self.actual_additional_tickers = []
+        self.threshold = threshold
 
-    def get_full_ticker_data(self, ticker_name = Tickers.USD000UTSTOM, sample_size = 0.5, use_first_sample = True):
+    def get_full_ticker_data(self, ticker_name = Tickers.USD000UTSTOM, sample_size = 0.5, use_first_sample = True,
+                             is_classification=True):
         self.actual_additional_tickers = []
         raw_data = self.get_raw_ticker_data(ticker_name)
         data = self.add_bbands(raw_data)
@@ -50,21 +53,35 @@ class DataPreprocessingForNonlinear(object):
         data = self.get_weekly_and_daytime_parameters(data)
         data[self.VWAP] = ((data[self.OPEN] + data[self.CLOSE] +
                             (data[self.LOW] + data[self.HIGH]) / 2) / 3) / data[self.CLOSE]
-        data[self.CLOSE + '_relative'] = data[self.CLOSE].pct_change()
+        if not is_classification:
+            data[self.CLOSE + '_relative'] = data[self.CLOSE].pct_change()
+        else:
+            data[self.CLOSE + '_relative'] = data[self.CLOSE].pct_change()
+            data[self.CLOSE + '_relative'] = np.vectorize(self.get_three_class_for_target)(data[self.CLOSE + '_relative'])
         data = self.get_lagged_values(data)
         y, X = self.clean_from_unneeded_data(data, sample_size, use_first_sample)
         return y, X
+
+    def get_three_class_for_target(self, price_return):
+        if np.isnan(price_return):
+            return np.nan
+        if price_return <= -self.threshold:
+            return -1
+        elif price_return >= self.threshold:
+            return 1
+        else:
+            return 0
 
     def get_raw_ticker_data(self, ticker_name):
         unified_time_index = pd.read_csv(os.path.dirname(__file__) + '/final_index.csv', index_col=1, parse_dates=True,
                                          header=None).index
         folder_path = self.default_data_path + self.frequency.value + '/' + ticker_name.value + '/'
         final = self.get_columns_ticker_data(folder_path, unified_time_index)
-        for ticker in self.GENERAL_PRICES:
+        for ticker in self.ADDITIONAL_PRICES:
             if ticker_name != ticker:
                 local_data = self.get_reduced_columns_ticker_data(ticker, unified_time_index)
                 final.loc[:, ticker.name + self.CLOSE] = local_data[self.CLOSE]
-                final.loc[:, ticker.name + self.VOLUME] = local_data[self.VOLUME]
+                final.loc[:, ticker.name + self.VOLUME] = np.log(local_data[self.VOLUME] + 1)
                 self.actual_additional_tickers.append(ticker.name)
         return final
 
@@ -113,15 +130,15 @@ class DataPreprocessingForNonlinear(object):
 
     def get_lagged_values(self, data, clean_for_market_open = True):
         data[self.TARGET] = data[self.CLOSE + '_relative'].shift(-self.target_forward_freq_shift)
-        for i in range(1, self.backward_lags + 1):
+        for i in range(0, self.backward_lags):
             for column in self.columns_for_lags:
-                data[column + '_lag' + str(i)] = data[column].shift(i)
+                data[column + '_lag' + str(i+1)] = data[column].shift(i)
             for column in self.actual_additional_tickers:
-                data[column + self.CLOSE + '_lag' + str(i)] = data[column + self.CLOSE].shift(i)
-                data[column + self.VOLUME + '_lag' + str(i)] = data[column + self.VOLUME].shift(i)
-        data[self.BB_LOWER + '_lag1'] = data[self.BB_LOWER].shift(1)
-        data[self.BB_UPPER + '_lag1'] = data[self.BB_UPPER].shift(1)
-        data[self.BB_MIDLE + '_lag1'] = data[self.BB_MIDLE].shift(1)
+                data[column + self.CLOSE + '_lag' + str(i+1)] = data[column + self.CLOSE].shift(i)
+                data[column + self.VOLUME + '_lag' + str(i+1)] = data[column + self.VOLUME].shift(i)
+        data[self.BB_LOWER + '_lag1'] = data[self.BB_LOWER].shift(0)
+        data[self.BB_UPPER + '_lag1'] = data[self.BB_UPPER].shift(0)
+        data[self.BB_MIDLE + '_lag1'] = data[self.BB_MIDLE].shift(0)
         if clean_for_market_open and self.HOUR_FLOAT in data.columns:
             data = self.clean_lags_for_market_open(data, self.backward_lags, self.columns_for_lags)
         else:

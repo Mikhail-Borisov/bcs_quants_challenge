@@ -13,13 +13,14 @@ from sklearn.metrics import mean_absolute_error, r2_score
 
 class XGBoostOnlineBatchParametersFit(object):
     def __init__(self):
-        self.data_class = DataPreprocessingForNonlinear(backward_lags=5, forward_lag=0, hour_dummies=True)
-        self.backward_window_in_days = 25
+        self.data_class = DataPreprocessingForNonlinear(backward_lags=5, forward_lag=1, hour_dummies=True)
+        self.backward_window_in_days = 150
         self.forward_window_in_days = 1
         self.weights = 'none'
+        self.importance = pd.DataFrame()
 
     def run_xgboost_testing(self, ticker = Tickers.USD000UTSTOM):
-        y_train, X_train = self.data_class.get_full_ticker_data(ticker, sample_size=0.99)
+        y_train, X_train = self.data_class.get_full_ticker_data(ticker, sample_size=0.5)
         starting_time = X_train.index.min() - timedelta(hours=1)
         sample_length = (X_train.index.max() - X_train.index.min()).days
         results = pd.DataFrame()
@@ -59,17 +60,18 @@ class XGBoostOnlineBatchParametersFit(object):
 
     def get_fitted_model(self, X, y):
         if self.weights == 'linear':
-            weights = np.linspace(0.0, 1.0, num=len(X))
+            weights = np.linspace(0.5, 1.0, num=len(X))
+            weights = weights / sum(weights)
         elif self.weights == 'exp':
             weights = np.logspace(1.0, 3.0, num=len(X))
-            weights = weights/max(weights)
+            weights = weights/sum(weights)
         else:
             weights = np.linspace(1.0, 1.0, num=len(X))
         scaler = StandardScaler()
         X_train_scaled = scaler.fit_transform(X)
-        param = {'booster': 'gblinear', 'lambda': 0.1, 'alpha': 0.1, 'eta': 0.1, 'silent': 1, 'objective': 'reg:linear'}
+        param = {'booster': 'gblinear', 'lambda': 0.1, 'alpha': 0.1, 'eta': 0.05, 'silent': 1, 'objective': 'reg:linear'}
         dtrain = xgb.DMatrix(X_train_scaled, y, weight=weights)
-        model = xgb.train(param, dtrain, num_boost_round=100)
+        model = xgb.train(param, dtrain, num_boost_round=250)
         r_square = r2_score(y, model.predict(dtrain), sample_weight=weights)
         return model, r_square, scaler
 
@@ -78,7 +80,7 @@ class XGBoostOnlineBatchParametersFit(object):
         rmse = mean_absolute_error(results['y_test'], results['predicted'])
         print(self.weights, self.backward_window_in_days, self.forward_window_in_days, ticker,
             r2, rmse)
-        results.to_csv('xgboost_result_' + ticker.value + '.csv')
+        results.to_csv('xgboost_result_' + ticker.value + '_ADDITIONAL_ASSETS.csv')
 
 
 if __name__ == '__main__':

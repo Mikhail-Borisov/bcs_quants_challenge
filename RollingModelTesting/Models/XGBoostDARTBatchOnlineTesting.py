@@ -17,7 +17,7 @@ class XGBoostOnlineBatchParametersFit(object):
         self.weights = 'none'
 
     def run_xgboost_testing(self, ticker = Tickers.USD000UTSTOM):
-        y_train, X_train = self.data_class.get_full_ticker_data(ticker, sample_size=0.5)
+        y_train, X_train = self.data_class.get_full_ticker_data(ticker, sample_size=0.35)
         starting_time = X_train.index.min() - timedelta(hours=1)
         sample_length = (X_train.index.max() - X_train.index.min()).days
         results = pd.DataFrame()
@@ -53,9 +53,11 @@ class XGBoostOnlineBatchParametersFit(object):
         return final
 
     def get_fitted_model(self, X, y):
-        param = {'max_depth': 1, 'min_child_weight': 9, 'eta': 0.05,
+        param = {'booster': 'dart', 'max_depth': 1, 'min_child_weight': 9, 'eta': 0.05,
                  'silent': 1, 'objective': 'reg:linear',
-                 'subsample': 0.9, 'colsample_bytree': 0.5, 'colsample_bylevel': 1.0}
+                 'subsample': 0.9, 'colsample_bytree': 0.5, 'colsample_bylevel': 1.0,
+                 'sample_type': 'uniform', 'normalize_type': 'tree',
+                 'rate_drop': 0.05, 'skip_drop': 0.5}
         if self.weights == 'linear':
             weights = np.linspace(0.0, 1.0, num=len(X))
         elif self.weights == 'exp':
@@ -64,7 +66,7 @@ class XGBoostOnlineBatchParametersFit(object):
         else:
             weights = np.linspace(1.0, 1.0, num=len(X))
         dtrain = xgb.DMatrix(X, y, weight=weights)
-        model = xgb.train(param, dtrain, num_boost_round=250)
+        model = xgb.train(param, dtrain, num_boost_round=1000)
         r_square = r2_score(y, model.predict(dtrain), sample_weight=weights)
         return model, r_square
 
@@ -73,7 +75,7 @@ class XGBoostOnlineBatchParametersFit(object):
         rmse = mean_absolute_error(results['y_test'], results['predicted'])
         print(self.weights, self.backward_window_in_days, self.forward_window_in_days, ticker,
             r2, rmse)
-        results.to_csv('xgboost_result_tree_' + ticker.value + '_ADDITIONAL_ASSETS.csv')
+        results.to_csv('xgboost_result_tree_DART_' + ticker.value + '_ADDITIONAL_ASSETS.csv')
 
 
 if __name__ == '__main__':

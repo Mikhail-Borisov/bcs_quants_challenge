@@ -15,6 +15,7 @@ class XGBoostOnlineBatchParametersFit(object):
         self.backward_window_in_days = 125
         self.forward_window_in_days = 1
         self.weights = 'none'
+        self.model = None
 
     def run_xgboost_testing(self, ticker = Tickers.USD000UTSTOM):
         y_train, X_train = self.data_class.get_full_ticker_data(ticker, sample_size=0.5)
@@ -64,7 +65,13 @@ class XGBoostOnlineBatchParametersFit(object):
         else:
             weights = np.linspace(1.0, 1.0, num=len(X))
         dtrain = xgb.DMatrix(X, y, weight=weights)
-        model = xgb.train(param, dtrain, num_boost_round=250)
+        if self.model is None:
+            model = xgb.train(param, dtrain, num_boost_round=250)
+        else:
+            param.update({'process_type': 'update',
+                          'updater': 'refresh',
+                          'refresh_leaf': True})
+            model = xgb.train(param, dtrain, num_boost_round=250, xgb_model=self.model)
         r_square = r2_score(y, model.predict(dtrain), sample_weight=weights)
         return model, r_square
 
@@ -73,7 +80,7 @@ class XGBoostOnlineBatchParametersFit(object):
         rmse = mean_absolute_error(results['y_test'], results['predicted'])
         print(self.weights, self.backward_window_in_days, self.forward_window_in_days, ticker,
             r2, rmse)
-        results.to_csv('xgboost_result_tree_' + ticker.value + '_ADDITIONAL_ASSETS.csv')
+        results.to_csv('xgboost_result_tree_UPDATED_' + ticker.value + '_ADDITIONAL_ASSETS.csv')
 
 
 if __name__ == '__main__':
